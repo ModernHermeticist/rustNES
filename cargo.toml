@@ -1,0 +1,4 @@
+[package]
+name = "rustNES_Disassembler"
+version = "0.0.1"
+authors = ["Jacob Queen"]
