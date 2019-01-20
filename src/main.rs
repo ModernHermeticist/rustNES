@@ -2,13 +2,9 @@ mod file_handling;
 mod opcode;
 mod header;
 mod cpu;
-mod instructions;
 
 fn main()
 {
-    let mut pc = 0x10;
-    let mut step = 0x2;
-
     let mut op_desc = String::from("");
     let mut op_code: u8 = 0x0;
 
@@ -19,6 +15,7 @@ fn main()
 
     let buffer = file_handling::store_file(f);
     let mut list_of_opcodes = Vec::new();
+    let mut cur_opcode = opcode::set_opcode(0x00, 0, 0, " ".to_string());
 
 
     for element in buffer.iter()
@@ -28,22 +25,31 @@ fn main()
 
     let h = header::set_header(list_of_opcodes.clone());
 
-    list_of_opcodes.drain(0..15);
 
-    for element in list_of_opcodes.iter().step_by(step)
+    for mut i in 0x10..(list_of_opcodes.len() - 0x02)
     {
-        op_desc = opcode::get_opcode_description(element.clone());
-        op_code = opcode::get_opcode_code(element.clone());
-        step = opcode::get_opcode_length(element.clone());
-        println!("{:#04X}: {:#04X} | {}", pc, op_code, op_desc);
-        pc += step;
+        if i >= 0x05 + 0x0F
+        {
+            break;
+        }
+        cur_opcode = list_of_opcodes[i].clone();
+        op_desc = opcode::get_opcode_description(list_of_opcodes[i].clone());
+        op_code = opcode::get_opcode_code(list_of_opcodes[i].clone());
+        cpu.set_instruction(opcode::get_opcode_code(list_of_opcodes[i].clone()));
+        cpu.set_first_byte_of_interest(opcode::get_opcode_code(list_of_opcodes[i+1].clone()));
+        cpu.set_second_byte_of_interest(opcode::get_opcode_code(list_of_opcodes[i+2].clone()));
+
+        println!("{:#04X}: {:#04X} | {}", cpu.get_pc(), op_code, op_desc);
+        op_code = cpu.get_instruction();
+        println!("{:#04X}", op_code);
+        op_code = cpu.get_first_byte_of_interest();
+        println!("{:#04X}", op_code);
+        op_code = cpu.get_second_byte_of_interest();
+        println!("{:#04X}", op_code);
+        println!("Interrupt Flag: {:#04X}", cpu.get_interrupt_flag());
+        cpu.execute_opcode(cur_opcode);
+        println!("Interrupt Flag: {:#04X}", cpu.get_interrupt_flag());
+        i = cpu.get_pc() as usize;
     }
 
-    header::print_header(h);
-
-    println!("{}", cpu.get_pc());
-    cpu.increment_pc(2);
-    println!("{}", cpu.get_pc());
-    cpu = instructions::brk(cpu);
-    println!("{}", cpu.get_pc());
 }
