@@ -3,6 +3,9 @@ mod opcode;
 mod header;
 mod cpu;
 
+use std::time::Duration;
+use std::thread;
+
 fn main()
 {
     let mut op_desc: String;
@@ -55,6 +58,7 @@ fn main()
         println!("_____________________________________\n");
         i = cpu.get_pc() as usize;
         n += 1;
+        thread::sleep(Duration::from_millis(1000));
     }
 
 }

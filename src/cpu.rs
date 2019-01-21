@@ -727,13 +727,9 @@ impl CPU
 
     fn bpl(&mut self) // 0x10
     {
-        if self.negative_flag == 0x0
-        {
+        if self.negative_flag == 0x1
             self.increment_pc(2);
-        }
         else
-        {
             self.pc = self.first_byte_of_interest as u16;
-        }
     }
 }
