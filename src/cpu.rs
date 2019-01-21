@@ -1,5 +1,33 @@
 use opcode::*;
 
+//DEFINES
+
+//NES specific hardware defines
+
+static PPU_CTRL_REG1      : u16 = 0x2000;
+static PPU_CTRL_REG2      : u16 = 0x2001;
+static PPU_STATUS         : u16 = 0x2002;
+static PPU_SPR_ADDR       : u16 = 0x2003;
+static PPU_SPR_DATA       : u16 = 0x2004;
+static PPU_SCROLL_REG     : u16 = 0x2005;
+static PPU_ADDRESS        : u16 = 0x2006;
+static PPU_DATA           : u16 = 0x2007;
+
+static SND_REGISTER       : u16 = 0x4000;
+static SND_SQUARE1_REG    : u16 = 0x4000;
+static SND_SQUARE2_REG    : u16 = 0x4004;
+static SND_TRIANGLE_REG   : u16 = 0x4008;
+static SND_NOISE_REG      : u16 = 0x400C;
+static SND_DELTA_REG      : u16 = 0x4010;
+static SND_MASTERCTRL_REG : u16 = 0x4015;
+
+static SPR_DMA            : u16 = 0x4014;
+static JOYPAD_PORT        : u16 = 0x4016;
+static JOYPAD_PORT1       : u16 = 0x4016;
+static JOYPAD_PORT2       : u16 = 0x4017;
+
+
+
 #[derive(Debug, Clone)]
 pub struct CPU
 {
@@ -11,7 +39,9 @@ pub struct CPU
     a: u8, // accumulator
     x: u8, // x-index, used for address modes
     y: u8, // y-index, used for address modes
-    s: u8, // stack pointer, accessed using interrupts, pulls, pushes, and transfers
+    s: u16, // stack pointer, accessed using interrupts, pulls, pushes, and transfers
+    // points between 0x0100 and 0x01FF in memory
+    stack_offset: u16,
     carry_flag: u8,
     zero_flag: u8,
     interrupt_flag: u8,
@@ -21,7 +51,7 @@ pub struct CPU
     instruction: u8, // current instruction cpu is processing
     first_byte_of_interest: u8, // first byte following opcode
     second_byte_of_interest: u8, // second byte following opcode, may be of interest
-    ram: Vec<u8>,
+    memory: Vec<u16>,
 }
 
 pub fn init_cpu() -> CPU
@@ -32,7 +62,8 @@ pub fn init_cpu() -> CPU
         a: 0x0,
         x: 0x0,
         y: 0x0,
-        s: 0x0,
+        s: 0x1000,
+        stack_offset: 0x1000,
         carry_flag: 0x0,
         zero_flag: 0x0,
         interrupt_flag: 0x0,
@@ -42,7 +73,7 @@ pub fn init_cpu() -> CPU
         instruction: 0x0,
         first_byte_of_interest: 0x0,
         second_byte_of_interest: 0x0,
-        ram: Vec::with_capacity(0x07FF),
+        memory: vec![0x0; 0xFFFF],
     };
     return cpu;
 }
@@ -119,6 +150,16 @@ impl CPU
         self.y = val;
     }
 
+    pub fn get_s(&self) -> u16
+    {
+        return self.s;
+    }
+
+    pub fn set_s(&mut self, val: u16)
+    {
+        self.s = 0x1000 + val;
+    }
+
     pub fn get_carry_flag(&self) -> u8
     {
         return self.carry_flag;
@@ -177,19 +218,76 @@ impl CPU
         }
     }
 
-    fn left_nib_is_0(&self, rn: u8)
+    fn left_nib_is_0(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => self.brk(),
+            0x01 => self.ora_indirect_x(),
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_1(&self, rn: u8)
+    fn left_nib_is_1(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => self.bpl(),
+            0x01 => return ,
+            0x02 => return ,
+            0x03 => return ,
+            0x04 => return ,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return ,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_2(&self, rn: u8)
+    fn left_nib_is_2(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
     fn left_nib_is_3(&mut self, rn: u8)
@@ -216,19 +314,76 @@ impl CPU
         }
     }
 
-    fn left_nib_is_4(&self, rn: u8)
+    fn left_nib_is_4(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_5(&self, rn: u8)
+    fn left_nib_is_5(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_6(&self, rn: u8)
+    fn left_nib_is_6(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
     fn left_nib_is_7(&mut self, rn: u8)
@@ -255,44 +410,196 @@ impl CPU
         }
     }
 
-    fn left_nib_is_8(&self, rn: u8)
+    fn left_nib_is_8(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return ,
+            0x01 => return ,
+            0x02 => return ,
+            0x03 => return ,
+            0x04 => return ,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return ,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => self.sta_absolute(),
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_9(&self, rn: u8)
+    fn left_nib_is_9(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return ,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return ,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => self.txs(),
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return ,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_a(&self, rn: u8)
+    fn left_nib_is_a(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => self.ldy_immediate(),
+            0x01 => return ,
+            0x02 => self.ldx_immediate(),
+            0x03 => return ,
+            0x04 => self.ldy_zero_page(),
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => self.lda_immediate(),
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => self.ldy_absolute(),
+            0x0D => self.lda_absolute(),
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_b(&self, rn: u8)
+    fn left_nib_is_b(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => self.ldy_zero_page_x(),
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => self.ldy_absolute_x(),
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_c(&self, rn: u8)
+    fn left_nib_is_c(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_d(&self, rn: u8)
+    fn left_nib_is_d(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return ,
+            0x01 => return,
+            0x02 => return ,
+            0x03 => return ,
+            0x04 => return ,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => self.cld(),
+            0x09 => return ,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return ,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_e(&self, rn: u8)
+    fn left_nib_is_e(&mut self, rn: u8)
     {
-
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
-    fn left_nib_is_f(&self, rn: u8)
+    fn left_nib_is_f(&mut self, rn: u8)
     {
-        return;
+        match rn
+        {
+            0x00 => return,
+            0x01 => return ,
+            0x02 => return,
+            0x03 => return ,
+            0x04 => return,
+            0x05 => return ,
+            0x06 => return ,
+            0x07 => return ,
+            0x08 => return ,
+            0x09 => return,
+            0x0A => return ,
+            0x0B => return ,
+            0x0C => return ,
+            0x0D => return,
+            0x0E => return ,
+            0x0F => return ,
+            _    => return ,
+        }
     }
 
 
@@ -301,26 +608,26 @@ impl CPU
     // INSTRUCTIONS //
     ////////////////////////////////////////////////////
     ////////////////////////////////////////////////////
-    pub fn brk(&mut self) // 0x00
+    fn brk(&mut self) // 0x00
     {
         self.increment_pc(2);
     }
 
-    pub fn ora_indirect_x(&mut self) // 0x01
+    fn ora_indirect_x(&mut self) // 0x01
     {
         let target_address = (self.x + self.first_byte_of_interest) & 0xFF;//wraps around zero page
         self.a |= target_address;
         self.increment_pc(2);
     }
 
-    pub fn and_indirect_y(&mut self) // 0x31
+    fn and_indirect_y(&mut self) // 0x31
     {
         let target_address = self.y + self.first_byte_of_interest; // does not need to wrap
         self.a &= target_address;
         self.increment_pc(2);
     }
 
-    pub fn sei(&mut self) // 0x78
+    fn sei(&mut self) // 0x78
     {
         if self.interrupt_flag == 0x0
         {
@@ -331,5 +638,102 @@ impl CPU
             self.interrupt_flag = 0x0;
         }
         self.increment_pc(1);
+    }
+
+    fn cld(&mut self) // 0xD8
+    {
+        self.decimal_flag = 0x0;
+        self.increment_pc(1);
+    }
+
+    fn lda_immediate(&mut self) // 0xA9
+    {
+        self.a = self.first_byte_of_interest;
+        self.increment_pc(2);
+    }
+
+    fn lda_absolute(&mut self) // 0xAD
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        self.a = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn ldx_immediate(&mut self) // 0xA2
+    {
+        self.x = self.first_byte_of_interest;
+        self.increment_pc(2);
+    }
+
+    fn ldy_immediate(&mut self) // 0xA0
+    {
+        self.y = self.first_byte_of_interest;
+        self.increment_pc(2);
+    }
+
+    fn ldy_zero_page(&mut self) // 0xA4
+    {
+        self.y = self.memory[self.first_byte_of_interest as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn ldy_zero_page_x(&mut self) // 0xB4
+    {
+        let temp_address = self.first_byte_of_interest + self.x;
+
+        self.y = self.memory[temp_address as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn ldy_absolute(&mut self) // 0xAC
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        self.y = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn ldy_absolute_x(&mut self) // 0xBC
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        temp_address += self.x as u16;
+        self.a = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn sta_absolute(&mut self) // 0x8D
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        self.memory[temp_address as usize] = self.a as u16;
+        self.increment_pc(3);
+    }
+
+    fn txs(&mut self) // 0x9A
+    {
+        self.s = self.stack_offset + self.x as u16;
+        self.increment_pc(1);
+    }
+
+    fn bpl(&mut self) // 0x10
+    {
+        if self.negative_flag == 0x0
+        {
+            self.increment_pc(2);
+        }
+        else
+        {
+            self.pc = self.first_byte_of_interest as u16;
+        }
     }
 }
