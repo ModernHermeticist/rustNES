@@ -42,12 +42,8 @@ pub struct CPU
     s: u16, // stack pointer, accessed using interrupts, pulls, pushes, and transfers
     // points between 0x0100 and 0x01FF in memory
     stack_offset: u16,
-    carry_flag: u8,
-    zero_flag: u8,
-    interrupt_flag: u8,
-    decimal_flag: u8,
-    overflow_flag: u8,
-    negative_flag: u8,
+    p: u8, // flag register
+    // NVssDIZC
     instruction: u8, // current instruction cpu is processing
     first_byte_of_interest: u8, // first byte following opcode
     second_byte_of_interest: u8, // second byte following opcode, may be of interest
@@ -56,7 +52,7 @@ pub struct CPU
 
 pub fn init_cpu() -> CPU
 {
-    let cpu = CPU
+    let mut cpu = CPU
     {
         pc: 0x10,
         a: 0x0,
@@ -64,17 +60,13 @@ pub fn init_cpu() -> CPU
         y: 0x0,
         s: 0x1000,
         stack_offset: 0x1000,
-        carry_flag: 0x0,
-        zero_flag: 0x0,
-        interrupt_flag: 0x0,
-        decimal_flag: 0x0,
-        overflow_flag: 0x0,
-        negative_flag: 0x0,
+        p: 0b11010000,
         instruction: 0x0,
         first_byte_of_interest: 0x0,
         second_byte_of_interest: 0x0,
         memory: vec![0x0; 0xFFFF],
     };
+    cpu.memory[PPU_STATUS as usize] = 0b10100000;
     return cpu;
 }
 
@@ -162,32 +154,92 @@ impl CPU
 
     pub fn get_carry_flag(&self) -> u8
     {
-        return self.carry_flag;
+        return self.p & 0b00000001;
+    }
+
+    pub fn set_carry_flag(&mut self)
+    {
+        self.p |= 0b00000001;
+    }
+
+    pub fn reset_carry_flag(&mut self)
+    {
+        self.p &= 0b11111110;
     }
 
     pub fn get_zero_flag(&self) -> u8
     {
-        return self.zero_flag;
+        return self.p & 0b00000010;
+    }
+
+    pub fn set_zero_flag(&mut self)
+    {
+        self.p |= 0b00000010;
+    }
+
+    pub fn reset_zero_flag(&mut self)
+    {
+        self.p &= 0b11111101;
     }
 
     pub fn get_interrupt_flag(&self) -> u8
     {
-        return self.interrupt_flag;
+        return self.p & 0b00000100;
+    }
+
+    pub fn set_interrupt_flag(&mut self)
+    {
+        self.p |= 0b00000100;
+    }
+
+    pub fn reset_interrupt_flag(&mut self)
+    {
+        self.p &= 0b11111011;
     }
 
     pub fn get_decimal_flag(&self) -> u8
     {
-        return self.decimal_flag;
+        return self.p & 0b00001000;
+    }
+
+    pub fn set_decimal_flag(&mut self)
+    {
+        self.p |= 0b00001000;
+    }
+
+    pub fn reset_decimal_flag(&mut self)
+    {
+        self.p &= 0b11110111;
     }
 
     pub fn get_overflow_flag(&self) -> u8
     {
-        return self.overflow_flag;
+        return self.p & 0b01000000;
+    }
+
+    pub fn set_overflow_flag(&mut self)
+    {
+        self.p |= 0b01000000;
+    }
+
+    pub fn reset_overflow_flag(&mut self)
+    {
+        self.p &= 0b10111111;
     }
 
     pub fn get_negative_flag(&self) -> u8
     {
-        return self.negative_flag;
+        return self.p & 0b10000000;
+    }
+
+    pub fn set_negative_flag(&mut self)
+    {
+        self.p |= 0b10000000;
+    }
+
+    pub fn reset_negative_flag(&mut self)
+    {
+        self.p &= 0b01111111;
     }
 
     pub fn execute_opcode(&mut self, op: Opcode)
@@ -422,9 +474,9 @@ impl CPU
             0x05 => return ,
             0x06 => return ,
             0x07 => return ,
-            0x08 => return ,
+            0x08 => self.dey(),
             0x09 => return ,
-            0x0A => return ,
+            0x0A => self.txa(),
             0x0B => return ,
             0x0C => return ,
             0x0D => self.sta_absolute(),
@@ -446,7 +498,7 @@ impl CPU
             0x05 => return ,
             0x06 => return ,
             0x07 => return ,
-            0x08 => return ,
+            0x08 => self.tya(),
             0x09 => return,
             0x0A => self.txs(),
             0x0B => return ,
@@ -463,20 +515,20 @@ impl CPU
         match rn
         {
             0x00 => self.ldy_immediate(),
-            0x01 => return ,
+            0x01 => self.lda_indirect_x(),
             0x02 => self.ldx_immediate(),
             0x03 => return ,
             0x04 => self.ldy_zero_page(),
-            0x05 => return ,
-            0x06 => return ,
+            0x05 => self.lda_zero_page(),
+            0x06 => self.ldx_zero_page(),
             0x07 => return ,
-            0x08 => return ,
+            0x08 => self.tay(),
             0x09 => self.lda_immediate(),
-            0x0A => return ,
+            0x0A => self.tax(),
             0x0B => return ,
             0x0C => self.ldy_absolute(),
             0x0D => self.lda_absolute(),
-            0x0E => return ,
+            0x0E => self.ldx_absolute(),
             0x0F => return ,
             _    => return ,
         }
@@ -486,21 +538,21 @@ impl CPU
     {
         match rn
         {
-            0x00 => return,
-            0x01 => return ,
+            0x00 => self.bcs(),
+            0x01 => self.lda_indirect_y(),
             0x02 => return,
             0x03 => return ,
             0x04 => self.ldy_zero_page_x(),
-            0x05 => return ,
-            0x06 => return ,
+            0x05 => self.lda_zero_page_x(),
+            0x06 => self.ldx_zero_page_y(),
             0x07 => return ,
             0x08 => return ,
-            0x09 => return,
+            0x09 => self.lda_absolute_y(),
             0x0A => return ,
             0x0B => return ,
             0x0C => self.ldy_absolute_x(),
-            0x0D => return,
-            0x0E => return ,
+            0x0D => self.lda_absolute_x(),
+            0x0E => self.ldx_absolute_y(),
             0x0F => return ,
             _    => return ,
         }
@@ -518,9 +570,9 @@ impl CPU
             0x05 => return ,
             0x06 => return ,
             0x07 => return ,
-            0x08 => return ,
-            0x09 => return,
-            0x0A => return ,
+            0x08 => self.iny(),
+            0x09 => self.cmp_immediate(),
+            0x0A => self.dex(),
             0x0B => return ,
             0x0C => return ,
             0x0D => return,
@@ -566,7 +618,7 @@ impl CPU
             0x05 => return ,
             0x06 => return ,
             0x07 => return ,
-            0x08 => return ,
+            0x08 => self.inx(),
             0x09 => return,
             0x0A => return ,
             0x0B => return ,
@@ -615,40 +667,47 @@ impl CPU
 
     fn ora_indirect_x(&mut self) // 0x01
     {
-        let target_address = (self.x + self.first_byte_of_interest) & 0xFF;//wraps around zero page
-        self.a |= target_address;
+        self.x += self.first_byte_of_interest & 0xFF;//wraps around zero page
+        self.a |= self.memory[self.x as usize] as u8;
         self.increment_pc(2);
     }
 
     fn and_indirect_y(&mut self) // 0x31
     {
-        let target_address = self.y + self.first_byte_of_interest; // does not need to wrap
-        self.a &= target_address;
+        self.y += self.memory[self.first_byte_of_interest as usize] as u8; // does not need to wrap
+        self.a &= self.y;
         self.increment_pc(2);
     }
 
     fn sei(&mut self) // 0x78
     {
-        if self.interrupt_flag == 0x0
-        {
-            self.interrupt_flag = 0x1;
-        }
-        else if self.interrupt_flag == 0x1
-        {
-            self.interrupt_flag = 0x0;
-        }
+        self.set_interrupt_flag();
         self.increment_pc(1);
     }
 
     fn cld(&mut self) // 0xD8
     {
-        self.decimal_flag = 0x0;
+        self.reset_decimal_flag();
         self.increment_pc(1);
     }
 
     fn lda_immediate(&mut self) // 0xA9
     {
         self.a = self.first_byte_of_interest;
+        self.increment_pc(2);
+    }
+
+    fn lda_zero_page(&mut self) // 0xA5
+    {
+        self.a = self.memory[self.first_byte_of_interest as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn lda_zero_page_x(&mut self) // 0xB5
+    {
+        let temp_address = self.first_byte_of_interest + self.x;
+
+        self.a = self.memory[temp_address as usize] as u8;
         self.increment_pc(2);
     }
 
@@ -662,10 +721,81 @@ impl CPU
         self.increment_pc(3);
     }
 
+    fn lda_absolute_x(&mut self) // 0xBD
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        temp_address += self.x as u16;
+        self.a = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn lda_absolute_y(&mut self) // 0xB9
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        temp_address += self.y as u16;
+        self.a = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn lda_indirect_x(&mut self) // 0xA1
+    {
+        self.x += self.first_byte_of_interest & 0xFF;
+        self.a = self.memory[self.x as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn lda_indirect_y(&mut self) // 0xB1
+    {
+        self.y += self.memory[self.first_byte_of_interest as usize] as u8; // does not need to wrap
+        self.a = self.y;
+        self.increment_pc(2);
+    }
+
     fn ldx_immediate(&mut self) // 0xA2
     {
         self.x = self.first_byte_of_interest;
         self.increment_pc(2);
+    }
+
+    fn ldx_zero_page(&mut self) // 0xA6
+    {
+        self.x = self.memory[self.first_byte_of_interest as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn ldx_zero_page_y(&mut self) // 0xB6
+    {
+        let temp_address = self.first_byte_of_interest + self.y;
+
+        self.x = self.memory[temp_address as usize] as u8;
+        self.increment_pc(2);
+    }
+
+    fn ldx_absolute(&mut self) // 0xAE
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<=8;
+        temp_address |= self.first_byte_of_interest as u16;
+        self.x = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
+    }
+
+    fn ldx_absolute_y(&mut self) // 0xBE
+    {
+        let mut temp_address: u16 = 0x0000;
+        temp_address |= self.second_byte_of_interest as u16;
+        temp_address <<= 8;
+        temp_address |= self.first_byte_of_interest as u16;
+        temp_address += self.y as u16;
+        self.x = self.memory[temp_address as usize] as u8;
+        self.increment_pc(3);
     }
 
     fn ldy_immediate(&mut self) // 0xA0
@@ -705,7 +835,7 @@ impl CPU
         temp_address <<= 8;
         temp_address |= self.first_byte_of_interest as u16;
         temp_address += self.x as u16;
-        self.a = self.memory[temp_address as usize] as u8;
+        self.y = self.memory[temp_address as usize] as u8;
         self.increment_pc(3);
     }
 
@@ -727,9 +857,97 @@ impl CPU
 
     fn bpl(&mut self) // 0x10
     {
-        if self.negative_flag == 0x1
+        if self.get_negative_flag() == 0b10000000
+        {
             self.increment_pc(2);
+        }
         else
-            self.pc = self.first_byte_of_interest as u16;
+        {
+            self.pc += self.first_byte_of_interest as u16;
+        }
+    }
+
+    fn bcs(&mut self) // 0xB0
+    {
+        if self.get_carry_flag() == 0b00000001
+        {
+            self.pc += self.first_byte_of_interest as u16;
+        }
+        else
+        {
+            self.increment_pc(2);
+        }
+    }
+
+    fn cmp_immediate(&mut self) // 0xC9
+    {
+        if self.get_a() > self.first_byte_of_interest
+        {
+            self.set_carry_flag();
+            self.reset_zero_flag();
+            self.reset_negative_flag();
+
+        }
+        else if self.get_a() == self.first_byte_of_interest
+        {
+            self.set_carry_flag();
+            self.set_zero_flag();
+            self.reset_negative_flag();
+        }
+        else if self.get_a() < self.first_byte_of_interest
+        {
+            self.set_negative_flag();
+            self.reset_carry_flag();
+            self.reset_zero_flag();
+        }
+        self.increment_pc(2);
+    }
+
+    fn tax(&mut self) //0xAA
+    {
+        self.x = self.a;
+        self.increment_pc(1);
+    }
+
+    fn txa(&mut self) //0x8A
+    {
+        self.a = self.x;
+        self.increment_pc(1);
+    }
+
+    fn dex(&mut self) // 0xCA
+    {
+        self.x -= 0x01;
+        self.increment_pc(1);
+    }
+
+    fn inx(&mut self) // 0xE8
+    {
+        self.x += 0x01;
+        self.increment_pc(1);
+    }
+
+    fn tay(&mut self) // 0xA8
+    {
+        self.y = self.a;
+        self.increment_pc(1);
+    }
+
+    fn tya(&mut self) // 0x98
+    {
+        self.a = self.y;
+        self.increment_pc(1);
+    }
+
+    fn dey(&mut self) // 0x88
+    {
+        self.y -= 0x01;
+        self.increment_pc(1);
+    }
+
+    fn iny(&mut self) // 0xC8
+    {
+        self.y += 0x01;
+        self.increment_pc(1);
     }
 }

@@ -29,12 +29,8 @@ fn main()
     let h = header::set_header(list_of_opcodes.clone());
     let mut i = 0x10;
     let mut n = 0x0;
-    while i <= 0x10 + 0x20
+    while i <= 0xFFF
     {
-        if n == 0x0A
-        {
-            break;
-        }
         cur_opcode = list_of_opcodes[i].clone();
         op_desc = opcode::get_opcode_description(list_of_opcodes[i].clone());
         op_code = opcode::get_opcode_code(list_of_opcodes[i].clone());
